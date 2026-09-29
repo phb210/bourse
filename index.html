@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Surveillance Bourse</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js" charset="utf-8"></script>
+<style>
+:root{--bg:#eef1f5;--card:#fff;--bd:#b8c2d0;--tx:#1b2430;--mut:#66758a;--blue:#1e3a5f;--green:#15803d;--red:#c62828;--amber:#b45309}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.35 "Segoe UI",system-ui,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:var(--blue);color:#fff;padding:8px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+header h1{font-size:18px;margin:0}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px}
+.b-stopped{background:#e5e7eb;color:#374151}.b-waiting{background:#dcfce7;color:#14532d}.b-alert{background:var(--red);color:#fff;animation:blink 1s infinite}
+.b-live{background:#dcfce7;color:#14532d}.b-delayed{background:#fee2e2;color:#991b1b}.b-closed{background:#e5e7eb;color:#374151}.b-unknown{background:#fef3c7;color:#92400e}
+@keyframes blink{50%{opacity:.55}}
+.layout{display:grid;grid-template-columns:minmax(310px,390px) 1fr;gap:12px;padding:12px;max-width:1800px;margin:auto}
+@media (max-width:950px){.layout{grid-template-columns:1fr;padding:8px}}
+.col{min-width:0}
+.card{border:2px solid var(--bd);border-radius:10px;background:var(--card);margin-bottom:12px;overflow:hidden}
+.card>h2{margin:0;padding:6px 10px;font-size:14px;color:#fff;background:var(--blue);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card.ctl>h2{background:#166534}.card.set>h2{background:#475569}.card.alr>h2{background:#991b1b}.card.hist>h2{background:#6b4f1d}
+.card .body{padding:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0}
+label{font-size:12px;color:var(--mut)}
+input,select,button{font:inherit}
+input[type=text],input[type=number],input[type=password],input[type=email],select{padding:5px 7px;border:1px solid var(--bd);border-radius:6px;background:#fff;min-width:0}
+input[type=number]{width:78px}
+.grid2{display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center}
+.fs{border:1px solid var(--bd);border-radius:8px;padding:6px 8px;margin:6px 0}
+.fs legend{font-weight:700;font-size:12px;padding:0 4px}
+.fs.buy legend{color:var(--green)}.fs.sell legend{color:var(--red)}
+button{padding:7px 12px;border:0;border-radius:7px;cursor:pointer;background:#e2e8f0;color:#1b2430;font-weight:600}
+button:hover{filter:brightness(.95)}button:disabled{opacity:.5;cursor:not-allowed}
+button.go{background:var(--green);color:#fff;font-size:16px;padding:10px 16px}
+button.stop{background:var(--red);color:#fff;font-size:16px;padding:10px 16px}
+button.test{background:var(--amber);color:#fff}
+button.pri{background:var(--blue);color:#fff}
+button.sm{padding:3px 8px;font-size:12px}
+button.per.on{background:var(--blue);color:#fff}
+.sugg,.wl{list-style:none;margin:6px 0 0;padding:0;max-height:230px;overflow:auto;border:1px solid var(--bd);border-radius:6px}
+.sugg li,.wl li{padding:6px 8px;border-bottom:1px solid #edf0f4;cursor:pointer;display:flex;justify-content:space-between;gap:6px}
+.sugg li:hover,.wl li:hover{background:#eef4ff}.wl li.sel{background:#dbeafe;font-weight:700}
+.muted{color:var(--mut);font-size:12px}
+.quote-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px}
+.price{font-size:32px;font-weight:800}.chg{font-size:17px;font-weight:700}
+.up{color:var(--green)}.dn{color:var(--red)}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px 14px;margin-top:8px}
+.kv div{display:flex;justify-content:space-between;border-bottom:1px dotted #d5dbe4;padding:2px 0;gap:8px}
+.kv span:first-child{color:var(--mut)}.kv span:last-child{font-weight:700;text-align:right}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+#chart{width:100%;height:760px}
+@media (max-width:950px){#chart{height:640px}}
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th,.table td{padding:4px 6px;border-bottom:1px solid #e5e9f0;text-align:right;white-space:nowrap}
+.table th:first-child,.table td:first-child{text-align:left}
+.tscroll{overflow-x:auto}
+#log{height:170px;overflow:auto;background:#0f172a;color:#cbd5e1;font:12px/1.4 Consolas,monospace;padding:6px;border-radius:6px;white-space:pre-wrap}
+.msg{color:var(--red);font-weight:600;padding:4px 0}
+/* fenêtre d'alerte */
+#alertWin{position:fixed;inset:0;background:rgba(15,23,42,.72);z-index:1000;display:none;padding:10px;overflow:auto}
+#alertWin .win{background:#fff;border-radius:12px;max-width:1300px;margin:0 auto;overflow:hidden;border:3px solid var(--red)}
+#alertHead{color:#fff;padding:12px 16px;font-size:20px;font-weight:800;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+#alertBody{padding:10px 14px}
+#alertPlot{width:100%;height:760px}
+@media (max-width:950px){#alertPlot{height:640px}}
+.reason{border:2px solid var(--bd);border-radius:8px;padding:8px 12px;margin:8px 0;background:#fafbfd}
+.reason li{margin:4px 0}.reason .ok{color:var(--green)}.reason .ko{color:var(--red)}
+#ackBtn{width:100%;padding:16px;font-size:18px;background:#111827;color:#fff;border-radius:0}
+/* graphiques empilés */
+#panels{display:block}
+.panel>h2{flex-wrap:wrap}
+.panel.active{border-color:#2563eb;box-shadow:0 0 0 2px #93c5fd}
+.pact{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pshow{color:#fff;font-size:12px;cursor:pointer;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:6px}
+.pshow input{vertical-align:middle}
+.pchart{width:100%;height:600px}
+@media (max-width:950px){.pchart{height:520px}}
+.empty{padding:24px;text-align:center;color:var(--mut);border:2px dashed var(--bd);border-radius:10px;margin-bottom:12px}
+#loginWin{position:fixed;inset:0;background:rgba(15,23,42,.88);z-index:2000;display:none;align-items:center;justify-content:center}
+.lbox{background:#fff;border-radius:12px;padding:18px;max-width:460px;width:92%;border:3px solid var(--blue)}
+.lbox h2{margin:0 0 10px}
+.lbox input{width:100%}
+</style>
+</head>
+<body>
+<header>
+  <h1>📈 Surveillance Bourse</h1>
+  <div><span id="stateBadge" class="badge b-stopped">ARRÊTÉ</span> <button class="sm" id="btnLogout" hidden>Déconnexion</button></div>
+</header>
+
+<div class="layout">
+<!-- ============================ COLONNE GAUCHE ============================ -->
+<div class="col">
+
+  <section class="card ctl"><h2>▶ COMMANDE</h2><div class="body">
+    <div class="row">
+      <button id="btnStart" class="go" style="flex:1">▶ MARCHE</button>
+      <button id="btnStop" class="stop" style="flex:1" disabled>■ ARRÊT</button>
+    </div>
+    <div class="row">
+      <button id="btnTest" class="test" style="flex:1">🔔 Test de l'alarme (action affichée)</button>
+    </div>
+    <div class="row"><label><input type="checkbox" id="testNotify" checked> envoyer aussi la notification lors du test</label></div>
+    <div id="cmdMsg" class="msg"></div>
+    <div class="muted" id="cycleInfo"></div>
+  </div></section>
+
+  <section class="card"><h2>1 · RECHERCHE D'ACTIONS (Yahoo Finance)</h2><div class="body">
+    <input type="text" id="q" placeholder="Nom ou symbole : Apple, LVMH, TSLA…" style="width:100%" autocomplete="off">
+    <ul class="sugg" id="sugg" hidden></ul>
+    <div class="muted">Les correspondances s'affichent pendant la saisie ; cliquez pour ajouter.</div>
+  </div></section>
+
+  <section class="card"><h2>2 · ACTIONS SURVEILLÉES <span id="wlCount">0 / 10</span></h2><div class="body">
+    <ul class="wl" id="wl"></ul>
+    <div class="row"><button id="btnRemove" class="sm">Retirer l'action sélectionnée</button></div>
+    <div class="muted">Cliquer une action = l'afficher en direct à droite.</div>
+  </div></section>
+
+  <section class="card alr"><h2>3 · RÉGLAGES DE DÉCLENCHEMENT D'ALERTE</h2><div class="body">
+    <div class="muted" style="margin-bottom:4px">Indépendants du graphique affiché. Pris en compte à la prochaine analyse après « Enregistrer ».</div>
+    <div class="grid2">
+      <label>Base de temps entre 2 analyses (s)</label><input type="number" id="a_interval" min="5" max="86400">
+      <label>Bougie d'analyse</label>
+      <select id="a_candle"><option>1m</option><option>2m</option><option>5m</option><option>15m</option><option>30m</option><option>60m</option><option value="1d">1 jour</option><option value="1wk">1 semaine</option></select>
+    </div>
+    <fieldset class="fs"><legend>Indicateurs</legend>
+      <div class="row"><label>Moyenne mobile</label>
+        <select id="a_ma_type"><option>SMA</option><option>EMA</option></select>
+        <label>période</label><input type="number" id="a_ma_p" min="2" max="500"></div>
+      <div class="row"><label>RSI période</label><input type="number" id="a_rsi_p" min="2" max="100"></div>
+      <div class="row"><label>MACD rapide</label><input type="number" id="a_mf" min="2" max="100">
+        <label>lente</label><input type="number" id="a_ms" min="3" max="200">
+        <label>signal</label><input type="number" id="a_mg" min="2" max="100"></div>
+      <div class="row"><label>Croisement MACD valable sur les</label><input type="number" id="a_lb" min="1" max="50"><label>dernières bougies</label></div>
+    </fieldset>
+    <fieldset class="fs buy"><legend>Conditions d'ACHAT (toutes celles cochées)</legend>
+      <div class="row"><label><input type="checkbox" id="b_ma_on"> Cours &gt; MM, marge</label><input type="number" id="b_ma_m" step="0.1" min="0"><label>%</label></div>
+      <div class="row"><label><input type="checkbox" id="b_rsi_on"> RSI &lt;</label><input type="number" id="b_rsi" step="1" min="1" max="100"></div>
+      <div class="row"><label><input type="checkbox" id="b_macd_on"> MACD croise au-dessus de sa signal</label></div>
+    </fieldset>
+    <fieldset class="fs sell"><legend>Conditions de VENTE (toutes celles cochées)</legend>
+      <div class="row"><label><input type="checkbox" id="s_ma_on"> Cours &lt; MM, marge</label><input type="number" id="s_ma_m" step="0.1" min="0"><label>%</label></div>
+      <div class="row"><label><input type="checkbox" id="s_rsi_on"> RSI &gt;</label><input type="number" id="s_rsi" step="1" min="0" max="99"></div>
+      <div class="row"><label><input type="checkbox" id="s_macd_on"> MACD croise en dessous de sa signal</label></div>
+    </fieldset>
+    <div class="row"><button id="btnSaveAlert" class="pri">💾 Enregistrer les réglages d'alerte</button><span id="saveAlertMsg" class="muted"></span></div>
+  </div></section>
+
+  <section class="card set"><h2>4 · NOTIFICATIONS</h2><div class="body">
+    <div class="grid2">
+      <label>Canal</label>
+      <select id="n_mode">
+        <option value="whatsapp_then_email">WhatsApp, sinon e-mail</option>
+        <option value="whatsapp">WhatsApp seul</option>
+        <option value="email">E-mail seul</option>
+        <option value="both">WhatsApp + e-mail</option>
+        <option value="none">Aucune</option>
+      </select>
+    </div>
+    <fieldset class="fs"><legend>WhatsApp (gratuit via CallMeBot)</legend>
+      <div class="grid2"><label>Votre n° (+33…)</label><input type="text" id="n_wa_phone" placeholder="+33612345678">
+      <label>Clé API</label><input type="password" id="n_wa_key"></div>
+      <div class="muted">Clé obtenue en envoyant « I allow callmebot to send me messages » au contact CallMeBot (voir callmebot.com).</div>
+    </fieldset>
+    <fieldset class="fs"><legend>E-mail (secours)</legend>
+      <div class="grid2">
+        <label>Serveur SMTP</label><input type="text" id="n_host" placeholder="smtp.gmail.com">
+        <label>Port</label><input type="number" id="n_port" style="width:90px">
+        <label>SSL direct (465)</label><input type="checkbox" id="n_ssl">
+        <label>Identifiant</label><input type="text" id="n_user">
+        <label>Mot de passe</label><input type="password" id="n_pass">
+        <label>Expéditeur</label><input type="text" id="n_from">
+        <label>Destinataire</label><input type="text" id="n_to">
+      </div>
+    </fieldset>
+    <div class="row"><button id="btnSaveNotify" class="pri">💾 Enregistrer</button><button id="btnTestNotify">Envoyer un message de test</button></div>
+    <div id="notifyMsg" class="muted"></div>
+  </div></section>
+</div>
+
+<!-- ============================ COLONNE DROITE ============================ -->
+<div class="col">
+
+  <section class="card set"><h2>5 · RÉGLAGES DES GRAPHIQUES AFFICHÉS <span class="muted" style="color:#e2e8f0">propres à cet appareil - sans effet sur les alertes</span></h2><div class="body">
+    <div class="toolbar"><label><input type="checkbox" id="c_showall" checked> <b>Afficher les graphiques</b> (décochez pour ne garder que les cotations)</label></div>
+    <div class="toolbar" id="periods"></div>
+    <div class="toolbar">
+      <label>Bougie</label>
+      <select id="c_interval"><option value="auto">Auto</option><option value="1m">1 min</option><option value="2m">2 min</option><option value="5m">5 min</option><option value="15m">15 min</option><option value="30m">30 min</option><option value="60m">1 h</option><option value="1d">1 jour</option><option value="1wk">1 sem.</option><option value="1mo">1 mois</option></select>
+      <label>Style</label><select id="c_type"><option value="candle">Chandeliers</option><option value="line">Ligne</option></select>
+      <label><input type="checkbox" id="c_vol" checked> Volume</label>
+      <label>Actualisation (s)</label><input type="number" id="c_refresh" min="2" max="600" style="width:65px">
+      <label><input type="checkbox" id="c_zoom"> Zoom molette / gestes sur les graphiques</label>
+    </div>
+    <div class="row"><label>Moyenne mobile 1</label><select id="c_ma1t"><option>SMA</option><option>EMA</option></select><label>période</label><input type="number" id="c_ma1p" min="2" max="500">
+      <label>&nbsp;Moyenne mobile 2</label><select id="c_ma2t"><option>SMA</option><option>EMA</option></select><label>période (0 = masquée)</label><input type="number" id="c_ma2p" min="0" max="500"></div>
+    <div class="row"><label>RSI période</label><input type="number" id="c_rsi" min="2" max="100">
+      <label>&nbsp;MACD rapide</label><input type="number" id="c_mf" min="2" max="100"><label>lente</label><input type="number" id="c_ms" min="3" max="200"><label>signal</label><input type="number" id="c_mg" min="2" max="100"></div>
+    <div class="muted">Molette = zoom sur le temps, glisser = déplacer, double-clic = tout afficher. Pour faire défiler la page, placez la souris hors d'un graphique ou décochez le zoom. Chaque action a aussi sa propre case « Graphique ».</div>
+  </div></section>
+
+  <div id="panels"></div>
+  <div id="noPanels" class="empty">Ajoutez une action avec la recherche : elle s'affichera ici, chaque action sous la précédente.</div>
+
+  <section class="card"><h2>6 · TABLEAU DE SURVEILLANCE (dernière analyse)</h2><div class="body tscroll">
+    <table class="table" id="tbl"><thead><tr><th>Action</th><th>Cours</th><th>MM</th><th>RSI</th><th>MACD</th><th>Signal MACD</th><th>Verdict</th><th>Heure</th></tr></thead><tbody></tbody></table>
+  </div></section>
+
+  <section class="card hist"><h2>7 · HISTORIQUE DES ALERTES <button class="sm" id="btnXlsx">⬇ Alertes.xlsx</button></h2><div class="body tscroll">
+    <table class="table" id="hist"><thead><tr><th>Date</th><th>Heure</th><th>Action</th><th>Signal</th><th>Cours</th><th>Test</th><th>Notification</th><th>Acquittée</th><th></th></tr></thead><tbody></tbody></table>
+  </div></section>
+
+  <section class="card"><h2>8 · JOURNAL</h2><div class="body"><div id="log"></div></div></section>
+</div>
+</div>
+
+<!-- ============================ CONNEXION ============================ -->
+<div id="loginWin"><div class="lbox">
+  <h2>🔐 Connexion au serveur de surveillance</h2>
+  <div class="grid2" style="grid-template-columns:1fr">
+    <label>Adresse du serveur (vide = ce site lui-même)</label><input type="text" id="l_api" placeholder="https://monbourse.duckdns.org" autocomplete="url">
+    <label>Mot de passe</label><input type="password" id="l_pw" autocomplete="current-password">
+  </div>
+  <div id="l_msg" class="msg"></div>
+  <div class="row"><button id="l_btn" class="pri" style="flex:1">Se connecter</button></div>
+</div></div>
+
+<!-- ============================ FENÊTRE D'ALERTE ============================ -->
+<div id="alertWin"><div class="win">
+  <div id="alertHead"><span id="alertTitle"></span><span><button class="sm" id="alertNewTab">↗ nouvel onglet</button></span></div>
+  <div id="alertBody">
+    <div id="alertMeta" class="muted"></div>
+    <div id="alertPlot"></div>
+    <div class="reason"><b>Raisonnement qui conduit au signal</b><ul id="alertReason"></ul><div id="alertConcl" style="font-weight:800"></div></div>
+    <div class="reason"><b>Paramètres de déclenchement (enregistrés dans Alertes.xlsx)</b><div id="alertParams" class="muted"></div><div id="alertNotif" class="muted"></div></div>
+  </div>
+  <button id="ackBtn">✔ ACQUITTER L'ALERTE (retour en attente de déclenchement)</button>
+</div></div>
+
+<script src="config.js"></script>
+<script>
+"use strict";
+/* ---------------------------------------------------------------- utilitaires */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nf = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : Number(v).toLocaleString("fr-FR", {minimumFractionDigits: d, maximumFractionDigits: d});
+let API = "", TOKEN = "", needLogin = false;     // initialisés plus bas (après LS)
+async function api(path, opt) {
+  opt = opt || {};
+  if (needLogin && !opt.noAuth) throw new Error("Non connecté");
+  const headers = Object.assign({}, opt.headers || {});
+  if (TOKEN && !opt.login) headers["Authorization"] = "Bearer " + TOKEN;
+  const init = Object.assign({}, opt, {headers}); delete init.noAuth; delete init.login;
+  const r = await fetch(API + path, init);
+  let j = null; try { j = await r.json(); } catch (e) {}
+  if (r.status === 401 && !opt.login) { needLogin = true; showLogin(); throw new Error("Non connecté"); }
+  if (!r.ok) throw new Error((j && j.error) || ("Erreur " + r.status));
+  return j;
+}
+const put = (path, body) => api(path, {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+const post = (path, body) => api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+const LS = {get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+            set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }};
+
+/* ---------------------------------------------------------------- état */
+API = String(LS.get("apiBase", null) ?? (window.BOURSE_API || "")).replace(/\/+$/, ""); TOKEN = LS.get("token", "");
+let CFG = null;                 // configuration serveur (liste, alertes, notifications)
+let symbol = LS.get("symbol", null);
+const CHART_DEFAULT = {range: "1d", interval: "auto", type: "candle", volume: true, refresh: 15,
+  ma1t: "SMA", ma1p: 50, ma2t: "SMA", ma2p: 0, rsi: 14, mf: 12, ms: 26, msig: 9};
+let CS = Object.assign({}, CHART_DEFAULT, LS.get("chartCfg", {}));
+let shownAlert = null, alarmTimer = null, chartTimer = null, searchTimer = null;
+const coarse = window.matchMedia && window.matchMedia("(pointer:coarse)").matches;
+if (CS.zoom === undefined) CS.zoom = !coarse;
+const SHOW = LS.get("showChart", {});                 // case « Graphique » de chaque action (par défaut cochée)
+let showAll = LS.get("showAll", true);                // case générale « Afficher les graphiques »
+const chartOn = sym => showAll && SHOW[sym] !== false;
+const panels = new Map();                             // symbole -> panneau
+const PERIODS = [["1d","1 J"],["5d","5 J"],["1mo","1 M"],["3mo","3 M"],["6mo","6 M"],["1y","1 A"],["5y","5 A"],["10y","10 A"],["20y","20 A"]];
+
+/* ---------------------------------------------------------------- son / vibration */
+let actx = null;
+document.addEventListener("click", () => { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } });
+function beep() {
+  if (!actx) return;
+  try { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; g.gain.value = .15;
+        o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + .25); } catch (e) {}
+}
+
+/* ---------------------------------------------------------------- Graphiques Plotly */
+function rangebreaks(d) {
+  const b = [], s = d.session || {};
+  if (s.weekend_break) b.push({bounds: ["sat", "mon"]});
+  if (!d.daily && s.hour_breaks) b.push({pattern: "hour", bounds: [s.close_h, s.open_h]});
+  return b;
+}
+function lowerBound(a, v) { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < v) lo = m + 1; else hi = m; } return lo; }
+function mm(arrs, i0, i1) {
+  let mn = Infinity, mx = -Infinity;
+  for (const a of arrs) { if (!a) continue; for (let i = i0; i <= i1 && i < a.length; i++) { const v = a[i]; if (v == null) continue; if (v < mn) mn = v; if (v > mx) mx = v; } }
+  return [mn, mx];
+}
+function pad(mn, mx, f = .06) { if (!isFinite(mn) || !isFinite(mx)) return null; const p = (mx - mn) * f || Math.abs(mx) * .01 || 1; return [mn - p, mx + p]; }
+
+/* Réajuste l'échelle verticale de chaque zone aux données visibles (zoom sur le temps) */
+function fitY(gd) {
+  const d = gd._d; if (!d || !gd.layout) return;
+  let i0 = 0, i1 = d.x.length - 1;
+  const xr = gd.layout.xaxis && gd.layout.xaxis.range;
+  if (xr && !(gd.layout.xaxis.autorange)) {
+    const a = String(xr[0]).replace("T", " "), b = String(xr[1]).replace("T", " ");
+    i0 = Math.max(0, lowerBound(d.x, a) - 1);
+    i1 = Math.min(d.x.length - 1, lowerBound(d.x, b));
+  }
+  const upd = {};
+  const pr = pad(...mm([d.l, d.h, d.ma1, d.ma2, d.ma], i0, i1)); if (pr) { upd["yaxis.range"] = pr; upd["yaxis.autorange"] = false; }
+  if (gd._vol) { const [, vm] = mm([d.v], i0, i1); if (isFinite(vm)) { upd["yaxis2.range"] = [0, vm * 1.15]; upd["yaxis2.autorange"] = false; } }
+  const mr = pad(...mm([d.hist, d.macd, d.sig], i0, i1)); if (mr) { upd["yaxis4.range"] = mr; upd["yaxis4.autorange"] = false; }
+  Plotly.relayout(gd, upd);
+}
+
+function buildFig(d, o) {
+  const vol = o.volume !== false;
+  const dm = vol ? {p: [.47, 1], v: [.35, .45], r: [.19, .33], m: [0, .17]} : {p: [.42, 1], r: [.21, .38], m: [0, .19]};
+  const T = [];
+  const lab = d.labels;
+  if (o.type === "line") T.push({type: "scatter", mode: "lines", x: d.x, y: d.c, name: "Cours", line: {color: "#1f6feb", width: 1.7}, xaxis: "x", yaxis: "y"});
+  else T.push({type: "candlestick", x: d.x, open: d.o, high: d.h, low: d.l, close: d.c, name: "Cours", xaxis: "x", yaxis: "y",
+               increasing: {line: {color: "#16a34a"}}, decreasing: {line: {color: "#dc2626"}}});
+  if (d.ma1) T.push({type: "scatter", mode: "lines", x: d.x, y: d.ma1, name: lab.ma1, line: {color: "#f59e0b", width: 1.6}, xaxis: "x", yaxis: "y"});
+  if (d.ma2) T.push({type: "scatter", mode: "lines", x: d.x, y: d.ma2, name: lab.ma2, line: {color: "#8b5cf6", width: 1.6}, xaxis: "x", yaxis: "y"});
+  if (d.ma && !d.ma1) T.push({type: "scatter", mode: "lines", x: d.x, y: d.ma, name: lab.ma, line: {color: "#f59e0b", width: 1.8, dash: "dash"}, xaxis: "x", yaxis: "y"});
+  if (vol) T.push({type: "bar", x: d.x, y: d.v, name: "Volume", marker: {color: d.c.map((c, i) => c >= d.o[i] ? "#86efac" : "#fca5a5")}, xaxis: "x", yaxis: "y2", showlegend: false});
+  T.push({type: "scatter", mode: "lines", x: d.x, y: d.rsi, name: lab.rsi, line: {color: "#7c3aed", width: 1.4}, xaxis: "x", yaxis: "y3"});
+  T.push({type: "bar", x: d.x, y: d.hist, name: "Histogramme", marker: {color: d.hist.map(h => h == null ? "#ccc" : (h >= 0 ? "#86efac" : "#fca5a5"))}, xaxis: "x", yaxis: "y4", showlegend: false});
+  T.push({type: "scatter", mode: "lines", x: d.x, y: d.macd, name: lab.macd, line: {color: "#1f6feb", width: 1.4}, xaxis: "x", yaxis: "y4"});
+  T.push({type: "scatter", mode: "lines", x: d.x, y: d.sig, name: "Signal", line: {color: "#f97316", width: 1.4}, xaxis: "x", yaxis: "y4"});
+
+  const ann = [], shapes = [];
+  const title = (t, dom) => ann.push({xref: "paper", yref: "paper", x: .005, y: dom[1], xanchor: "left", yanchor: "top", text: "<b>" + t + "</b>", showarrow: false, font: {size: 11, color: "#475569"}});
+  title(o.priceTitle || "Cours", dm.p); if (vol) title("Volume", dm.v); title(lab.rsi, dm.r); title(lab.macd, dm.m);
+  shapes.push({type: "line", xref: "paper", x0: 0, x1: 1, yref: "y3", y0: 70, y1: 70, line: {dash: "dash", color: "#dc2626", width: 1}});
+  shapes.push({type: "line", xref: "paper", x0: 0, x1: 1, yref: "y3", y0: 30, y1: 30, line: {dash: "dash", color: "#16a34a", width: 1}});
+
+  if (o.alert) {                                   // annotations de la fenêtre d'alerte
+    const a = o.alert, col = a.signal === "ACHAT" ? "#15803d" : "#c62828", sym = a.signal === "ACHAT" ? "triangle-up" : "triangle-down";
+    T.push({type: "scatter", mode: "markers", x: [a.cross_x], y: [a.cross_y], marker: {symbol: sym, size: 17, color: col, line: {color: "#fff", width: 1.5}}, name: "Signal " + a.signal, xaxis: "x", yaxis: "y", showlegend: false});
+    ann.push({x: a.cross_x, y: a.cross_y, xref: "x", yref: "y", text: "<b>Signal " + a.signal + (a.test ? " (TEST)" : "") + "</b>", showarrow: true, arrowhead: 2, arrowwidth: 2, arrowcolor: col, ax: -70, ay: a.signal === "ACHAT" ? 60 : -60, font: {color: col, size: 13}, bgcolor: "#fff", bordercolor: col});
+    const box = (txt, dom) => ann.push({xref: "paper", yref: "paper", x: .012, y: dom[1] - .03, xanchor: "left", yanchor: "top", align: "left", text: txt, showarrow: false, bgcolor: "rgba(255,255,255,.92)", bordercolor: col, borderwidth: 1.5, borderpad: 4, font: {size: 11}});
+    const lp = a.lines;
+    box((lp.ma ? "① " + lp.ma + "<br>" : "") + "<b style='color:" + col + "'>" + a.concl + "</b>", dm.p);
+    if (lp.rsi) box("② " + lp.rsi, dm.r);
+    if (lp.macd) box("③ " + lp.macd, dm.m);
+  }
+  const ax = {type: "date", rangeslider: {visible: false}, rangebreaks: rangebreaks(d), anchor: "y4", showspikes: true, spikemode: "across", spikethickness: 1, spikecolor: "#64748b", gridcolor: "#e5e9f0", tickfont: {size: 11}};
+  const ya = (dom, extra) => Object.assign({domain: dom, side: "right", gridcolor: "#e5e9f0", tickfont: {size: 10}, zeroline: false}, extra || {});
+  const layout = {
+    margin: {l: 10, r: 58, t: 26, b: 34}, paper_bgcolor: "#fff", plot_bgcolor: "#fff", hovermode: "x unified", dragmode: "pan",
+    showlegend: true, legend: {orientation: "h", y: 1.03, x: 0, font: {size: 11}}, xaxis: ax,
+    yaxis: ya(dm.p), yaxis3: ya(dm.r, {range: [0, 100], fixedrange: true, tickvals: [30, 50, 70]}),
+    yaxis4: ya(dm.m), annotations: ann, shapes: shapes, uirevision: o.rev || "r",
+  };
+  if (vol) layout.yaxis2 = ya(dm.v);
+  return {data: T, layout};
+}
+
+function drawChart(div, d, o) {
+  const f = buildFig(d, o);
+  const zoom = o.zoom !== false;
+  f.layout.dragmode = zoom ? "pan" : false;
+  div._d = d; div._vol = o.volume !== false;
+  Plotly.react(div, f.data, f.layout, {scrollZoom: zoom, displaylogo: false, responsive: true,
+    modeBarButtonsToRemove: ["select2d", "lasso2d", "autoScale2d"]}).then(() => {
+    div.removeAllListeners && div.removeAllListeners("plotly_relayout");
+    div.on("plotly_relayout", ev => { if (ev && Object.keys(ev).some(k => k.startsWith("xaxis."))) fitY(div); });
+    fitY(div);
+  });
+}
+
+/* ---------------------------------------------------------------- Recherche */
+$("q").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  const q = $("q").value.trim();
+  if (!q) { $("sugg").hidden = true; return; }
+  searchTimer = setTimeout(async () => {
+    try {
+      const res = await api("/api/search?q=" + encodeURIComponent(q));
+      if ($("q").value.trim() !== q) return;
+      const ul = $("sugg"); ul.innerHTML = "";
+      res.forEach(s => {
+        const li = document.createElement("li");
+        li.innerHTML = "<span><b>" + esc(s.symbol) + "</b> " + esc(s.name) + "</span><span class='muted'>" + esc(s.exch) + " · " + esc(s.type) + "</span>";
+        li.onclick = () => addSymbol(s);
+        ul.appendChild(li);
+      });
+      ul.hidden = res.length === 0;
+      ul._first = res[0];
+    } catch (e) { $("cmdMsg").textContent = e.message; }
+  }, 220);
+});
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") { const s = $("sugg")._first; if (s) addSymbol(s); } });
+
+/* ---------------------------------------------------------------- Liste des actions */
+async function saveWatch(list) { CFG = await put("/api/config", {watchlist: list}); renderWatch(); syncPanels(); }
+async function addSymbol(s) {
+  if (CFG.watchlist.length >= 10) { $("cmdMsg").textContent = "La liste est limitée à 10 actions."; return; }
+  if (CFG.watchlist.some(w => w.symbol === s.symbol)) { selectSymbol(s.symbol, true); return; }
+  await saveWatch(CFG.watchlist.concat([{symbol: s.symbol, name: s.name, exch: s.exch}]));
+  $("q").value = ""; $("sugg").hidden = true;
+  selectSymbol(s.symbol, true); loadQuotes();
+}
+async function removeSymbol(sym) {
+  await saveWatch(CFG.watchlist.filter(w => w.symbol !== sym));
+  if (symbol === sym) { symbol = CFG.watchlist.length ? CFG.watchlist[0].symbol : null; LS.set("symbol", symbol); }
+  renderWatch(); markActive();
+}
+$("btnRemove").onclick = () => { if (symbol) removeSymbol(symbol); };
+function renderWatch() {
+  const ul = $("wl"); ul.innerHTML = "";
+  CFG.watchlist.forEach(w => {
+    const li = document.createElement("li");
+    if (w.symbol === symbol) li.className = "sel";
+    li.innerHTML = "<span><b>" + esc(w.symbol) + "</b> " + esc(w.name) + "</span><span class='muted'>" + esc(w.exch) + "</span>";
+    li.onclick = () => selectSymbol(w.symbol, true);
+    ul.appendChild(li);
+  });
+  $("wlCount").textContent = CFG.watchlist.length + " / 10";
+}
+function markActive() {
+  panels.forEach((p, s) => p.el.classList.toggle("active", s === symbol));
+  $("btnTest").textContent = "🔔 Test de l'alarme" + (symbol ? " (" + symbol + ")" : "");
+  renderWatch();
+}
+function selectSymbol(s, scroll) {
+  symbol = s; LS.set("symbol", s); markActive();
+  const p = panels.get(s); if (scroll && p) p.el.scrollIntoView({behavior: "smooth", block: "start"});
+}
+
+/* ---------------------------------------------------------------- Panneaux : une action = un cadre, empilés */
+function createPanel(w) {
+  const sym = w.symbol;
+  const el = document.createElement("section"); el.className = "card panel";
+  el.innerHTML = '<h2><span class="ptitle"></span><span class="pact"><span class="badge b-unknown pfeed">—</span>' +
+    '<label class="pshow"><input type="checkbox" class="pchk"> Graphique</label>' +
+    '<button class="sm ptest" title="Tester l\'alarme sur cette action">🔔 Test</button><button class="sm pdel" title="Retirer de la liste">✕</button></span></h2>' +
+    '<div class="body"><div class="quote-head"><div class="muted psub"></div><div class="price pprice"></div><div class="chg pchg"></div></div>' +
+    '<div class="muted pfeedinfo"></div><div class="kv pkv"></div>' +
+    '<div class="pwrap"><div class="msg pmsg"></div><div class="pchart"></div><div class="muted plast"></div></div></div>';
+  const q = c => el.querySelector(c);
+  const p = {el, title: q(".ptitle"), feed: q(".pfeed"), chk: q(".pchk"), sub: q(".psub"), price: q(".pprice"), chg: q(".pchg"),
+             feedinfo: q(".pfeedinfo"), kv: q(".pkv"), wrap: q(".pwrap"), msg: q(".pmsg"), chart: q(".pchart"), last: q(".plast"),
+             visible: false, busy: false, io: null};
+  p.title.textContent = sym + " - " + (w.name || "");
+  p.chk.checked = SHOW[sym] !== false;
+  p.chk.onchange = () => { SHOW[sym] = p.chk.checked; LS.set("showChart", SHOW); applyChartVisibility(sym); };
+  q(".ptest").onclick = e => { e.stopPropagation(); selectSymbol(sym); testAlarm(sym); };
+  q(".pdel").onclick = e => { e.stopPropagation(); removeSymbol(sym); };
+  el.addEventListener("click", () => { if (symbol !== sym) selectSymbol(sym); });
+  if ("IntersectionObserver" in window) {              // ne charge que les graphiques à l'écran
+    p.io = new IntersectionObserver(es => { p.visible = es[0].isIntersecting; if (p.visible) loadChart(sym); }, {rootMargin: "300px"});
+    p.io.observe(el);
+  }
+  panels.set(sym, p);
+  if (!p.io) { p.visible = true; loadChart(sym); }
+  applyChartVisibility(sym, true);
+  return p;
+}
+function applyChartVisibility(sym, silent) {
+  const p = panels.get(sym); if (!p) return;
+  const on = chartOn(sym);
+  p.wrap.hidden = !on; p.chk.disabled = !showAll;
+  if (!on) { try { Plotly.purge(p.chart); } catch (e) {} p.msg.textContent = ""; p.last.textContent = ""; }
+  else if (!silent) loadChart(sym);
+}
+function syncPanels() {
+  const box = $("panels"), want = CFG.watchlist.map(w => w.symbol);
+  for (const [s, p] of [...panels]) if (!want.includes(s)) { if (p.io) p.io.disconnect(); try { Plotly.purge(p.chart); } catch (e) {} p.el.remove(); panels.delete(s); }
+  CFG.watchlist.forEach((w, i) => {
+    const p = panels.get(w.symbol) || createPanel(w);
+    if (box.children[i] !== p.el) box.insertBefore(p.el, box.children[i] || null);
+  });
+  $("noPanels").hidden = want.length > 0;
+  markActive();
+}
+
+/* ---------------------------------------------------------------- Cotations (toutes les actions en une requête) */
+let quotesBusy = false;
+async function loadQuotes() {
+  if (quotesBusy || !CFG || !CFG.watchlist.length) return;
+  quotesBusy = true;
+  try {
+    const r = await api("/api/quotes?symbols=" + encodeURIComponent(CFG.watchlist.map(w => w.symbol).join(",")));
+    for (const [sym, q] of Object.entries(r)) updateQuote(sym, q);
+  } catch (e) { $("cmdMsg").textContent = "Cotations : " + e.message; }
+  finally { quotesBusy = false; }
+}
+function updateQuote(sym, q) {
+  const p = panels.get(sym); if (!p) return;
+  if (q.error) { p.feedinfo.textContent = "Cotation : " + q.error; return; }
+  const up = (q.change || 0) >= 0;
+  p.title.textContent = q.symbol + " - " + (q.name || "");
+  p.sub.textContent = [q.exchange, q.currency, q.type].filter(Boolean).join(" · ");
+  p.price.textContent = nf(q.price); p.price.className = "price pprice " + (up ? "up" : "dn");
+  p.chg.textContent = q.change == null ? "" : (up ? "+" : "") + nf(q.change) + "  (" + (up ? "+" : "") + nf(q.pct) + " %)";
+  p.chg.className = "chg pchg " + (up ? "up" : "dn");
+  const f = q.feed;
+  p.feed.textContent = f.status; p.feed.className = "badge pfeed b-" + f.level;
+  p.feedinfo.textContent = "Source : " + f.source + (f.lag_s != null ? " · dernière transaction il y a " + f.lag_s + " s" : "") +
+    (q.last_trade ? " · " + new Date(q.last_trade * 1000).toLocaleString("fr-FR") : "");
+  const rows = [["Ouverture", nf(q.open)], ["Clôture veille", nf(q.prev)], ["Plus haut (jour)", nf(q.high)], ["Plus bas (jour)", nf(q.low)],
+    ["Volume", nf(q.volume, 0)], ["Volume moyen 3 mois", nf(q.avg_volume, 0)], ["Achat (bid)", nf(q.bid)], ["Vente (ask)", nf(q.ask)],
+    ["52 sem. haut", nf(q.h52)], ["52 sem. bas", nf(q.l52)], ["Capitalisation", q.mcap ? nf(q.mcap / 1e9, 2) + " Md" : "—"],
+    ["PER", nf(q.pe)], ["BPA (12 mois)", nf(q.eps)], ["Rendement dividende", q.div_yield ? nf(q.div_yield * 100) + " %" : "—"],
+    ["Moyenne 50 j", nf(q.ma50)], ["Moyenne 200 j", nf(q.ma200)], ["État du marché", esc(q.market_state)]];
+  p.kv.innerHTML = rows.map(r => "<div><span>" + r[0] + "</span><span>" + r[1] + "</span></div>").join("");
+}
+
+/* ---------------------------------------------------------------- Graphiques */
+function chartQuery(sym) {
+  return new URLSearchParams({symbol: sym, range: CS.range, interval: CS.interval, ma1t: CS.ma1t, ma1p: CS.ma1p,
+    ma2t: CS.ma2t, ma2p: CS.ma2p, rsi: CS.rsi, mf: CS.mf, ms: CS.ms, msig: CS.msig}).toString();
+}
+async function loadChart(sym) {
+  const p = panels.get(sym);
+  if (!p || p.busy || !chartOn(sym) || !p.visible) return;
+  p.busy = true;
+  try {
+    const d = await api("/api/chart?" + chartQuery(sym));
+    if (!panels.has(sym) || !chartOn(sym)) return;
+    p.msg.textContent = d.note || "";
+    drawChart(p.chart, d, {type: CS.type, volume: CS.volume, zoom: CS.zoom, priceTitle: sym + " · bougies " + d.interval, rev: sym + CS.range + d.interval});
+    const last = a => { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i]; return null; };
+    p.last.textContent = d.labels.ma1 + " : " + nf(last(d.ma1)) + (d.ma2 ? "  ·  " + d.labels.ma2 + " : " + nf(last(d.ma2)) : "") +
+      "  ·  " + d.labels.rsi + " : " + nf(last(d.rsi), 1) + "  ·  " + d.labels.macd + " : " + nf(last(d.macd), 3) + " / signal " + nf(last(d.sig), 3);
+  } catch (e) { p.msg.textContent = e.message; }
+  finally { p.busy = false; }
+}
+let chartsBusy = false;
+async function refreshCharts() {
+  if (chartsBusy) return;
+  chartsBusy = true;
+  try { for (const s of [...panels.keys()]) await loadChart(s); } finally { chartsBusy = false; }
+}
+function armChartTimer() { clearInterval(chartTimer); chartTimer = setInterval(refreshCharts, Math.max(2, CS.refresh) * 1000); }
+
+function renderPeriods() {
+  const box = $("periods"); box.innerHTML = "<label>Durée :</label>";
+  PERIODS.forEach(([k, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = "sm per" + (CS.range === k ? " on" : "");
+    b.onclick = () => { CS.range = k; saveChartCfg(); renderPeriods(); refreshCharts(); }; box.appendChild(b); });
+}
+const CHART_FIELDS = {c_interval: "interval", c_type: "type", c_refresh: "refresh", c_ma1t: "ma1t", c_ma1p: "ma1p", c_ma2t: "ma2t", c_ma2p: "ma2p", c_rsi: "rsi", c_mf: "mf", c_ms: "ms", c_mg: "msig"};
+function saveChartCfg() { LS.set("chartCfg", CS); }
+function fillChartForm() {
+  for (const [id, k] of Object.entries(CHART_FIELDS)) $(id).value = CS[k];
+  $("c_vol").checked = !!CS.volume; $("c_zoom").checked = !!CS.zoom; $("c_showall").checked = showAll;
+}
+function bindChartForm() {
+  const onChange = () => {
+    for (const [id, k] of Object.entries(CHART_FIELDS)) { const el = $(id); CS[k] = el.type === "number" ? Number(el.value) : el.value; }
+    CS.volume = $("c_vol").checked; CS.zoom = $("c_zoom").checked;
+    saveChartCfg(); armChartTimer(); refreshCharts();
+  };
+  [...Object.keys(CHART_FIELDS), "c_vol", "c_zoom"].forEach(id => $(id).addEventListener("change", onChange));
+  $("c_showall").addEventListener("change", () => {          // afficher / masquer tous les graphiques
+    showAll = $("c_showall").checked; LS.set("showAll", showAll);
+    panels.forEach((p, s) => applyChartVisibility(s));
+  });
+}
+
+/* ---------------------------------------------------------------- Réglages d'alerte */
+function fillAlertForm(a) {
+  $("a_interval").value = a.interval_s; $("a_candle").value = a.candle;
+  $("a_ma_type").value = a.ma.type; $("a_ma_p").value = a.ma.period; $("a_rsi_p").value = a.rsi.period;
+  $("a_mf").value = a.macd.fast; $("a_ms").value = a.macd.slow; $("a_mg").value = a.macd.signal; $("a_lb").value = a.macd_lookback;
+  $("b_ma_on").checked = a.buy.ma_on; $("b_ma_m").value = a.buy.ma_margin_pct; $("b_rsi_on").checked = a.buy.rsi_on; $("b_rsi").value = a.buy.rsi_max; $("b_macd_on").checked = a.buy.macd_on;
+  $("s_ma_on").checked = a.sell.ma_on; $("s_ma_m").value = a.sell.ma_margin_pct; $("s_rsi_on").checked = a.sell.rsi_on; $("s_rsi").value = a.sell.rsi_min; $("s_macd_on").checked = a.sell.macd_on;
+}
+function readAlertForm() {
+  return {interval_s: +$("a_interval").value, candle: $("a_candle").value,
+    ma: {type: $("a_ma_type").value, period: +$("a_ma_p").value}, rsi: {period: +$("a_rsi_p").value},
+    macd: {fast: +$("a_mf").value, slow: +$("a_ms").value, signal: +$("a_mg").value}, macd_lookback: +$("a_lb").value,
+    buy: {ma_on: $("b_ma_on").checked, ma_margin_pct: +$("b_ma_m").value, rsi_on: $("b_rsi_on").checked, rsi_max: +$("b_rsi").value, macd_on: $("b_macd_on").checked},
+    sell: {ma_on: $("s_ma_on").checked, ma_margin_pct: +$("s_ma_m").value, rsi_on: $("s_rsi_on").checked, rsi_min: +$("s_rsi").value, macd_on: $("s_macd_on").checked}};
+}
+async function saveAlertCfg() {
+  CFG = await put("/api/config", {alert: readAlertForm()});
+  fillAlertForm(CFG.alert);
+  $("saveAlertMsg").textContent = "✔ enregistré " + new Date().toLocaleTimeString("fr-FR");
+}
+$("btnSaveAlert").onclick = () => saveAlertCfg().catch(e => $("saveAlertMsg").textContent = e.message);
+
+/* ---------------------------------------------------------------- Notifications */
+function fillNotify(n) {
+  $("n_mode").value = n.mode; $("n_wa_phone").value = n.wa_phone; $("n_wa_key").value = n.wa_apikey;
+  $("n_host").value = n.smtp_host; $("n_port").value = n.smtp_port; $("n_ssl").checked = n.smtp_ssl;
+  $("n_user").value = n.smtp_user; $("n_pass").value = n.smtp_pass; $("n_from").value = n.mail_from; $("n_to").value = n.mail_to;
+}
+function readNotify() {
+  return {mode: $("n_mode").value, wa_phone: $("n_wa_phone").value, wa_apikey: $("n_wa_key").value, smtp_host: $("n_host").value,
+    smtp_port: +$("n_port").value, smtp_ssl: $("n_ssl").checked, smtp_user: $("n_user").value, smtp_pass: $("n_pass").value,
+    mail_from: $("n_from").value, mail_to: $("n_to").value};
+}
+$("btnSaveNotify").onclick = async () => {
+  try { CFG = await put("/api/config", {notify: readNotify()}); fillNotify(CFG.notify); $("notifyMsg").textContent = "✔ enregistré"; }
+  catch (e) { $("notifyMsg").textContent = e.message; }
+};
+$("btnTestNotify").onclick = async () => {
+  $("notifyMsg").textContent = "Envoi…";
+  try { const r = await post("/api/notify/test", {notify: readNotify()}); $("notifyMsg").textContent = r.result; }
+  catch (e) { $("notifyMsg").textContent = e.message; }
+};
+
+/* ---------------------------------------------------------------- Commandes */
+$("btnStart").onclick = async () => {
+  $("cmdMsg").textContent = "";
+  try { await saveAlertCfg(); await post("/api/monitor/start"); pollStatus(); } catch (e) { $("cmdMsg").textContent = e.message; }
+};
+$("btnStop").onclick = async () => { try { await post("/api/monitor/stop"); pollStatus(); } catch (e) { $("cmdMsg").textContent = e.message; } };
+async function testAlarm(sym) {
+  $("cmdMsg").textContent = "";
+  if (!sym) { $("cmdMsg").textContent = "Sélectionnez d'abord une action."; return; }
+  try { await post("/api/alert/test", {symbol: sym, notify: $("testNotify").checked}); pollStatus(); }
+  catch (e) { $("cmdMsg").textContent = e.message; }
+}
+$("btnTest").onclick = () => testAlarm(symbol);
+
+/* ---------------------------------------------------------------- Statut / journal / tableaux */
+const STATE_TXT = {stopped: ["ARRÊTÉ - appuyez sur MARCHE", "b-stopped"], waiting: ["● SURVEILLANCE ACTIVE - en attente de déclenchement", "b-waiting"], alert: ["🚨 ALERTE - acquittement requis", "b-alert"]};
+async function pollStatus() {
+  try {
+    const s = await api("/api/status");
+    const [t, c] = STATE_TXT[s.state]; $("stateBadge").textContent = t; $("stateBadge").className = "badge " + c;
+    $("btnStart").disabled = s.running; $("btnStop").disabled = !s.running;
+    $("cycleInfo").textContent = s.running ? "Analyse toutes les " + s.interval_s + " s" + (s.cycle_at ? " · dernier cycle " + new Date(s.cycle_at * 1000).toLocaleTimeString("fr-FR") : "") : "";
+    const lg = $("log"), stick = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
+    lg.textContent = s.log.join("\n"); if (stick) lg.scrollTop = lg.scrollHeight;
+    $("tbl").tBodies[0].innerHTML = s.table.map(r => "<tr><td><b>" + esc(r.symbol) + "</b></td>" +
+      (r.price != null ? "<td>" + nf(r.price) + "</td><td>" + nf(r.ma) + "</td><td>" + nf(r.rsi, 1) + "</td><td>" + nf(r.macd, 3) + "</td><td>" + nf(r.sig, 3) + "</td>" +
+        "<td style='font-weight:700;color:" + (r.verdict === "ACHAT" ? "#15803d" : r.verdict === "VENTE" ? "#c62828" : "#66758a") + "'>" + esc(r.verdict) + "</td>"
+        : "<td colspan='5'></td><td>" + esc(r.verdict) + "</td>") + "<td>" + new Date(r.at * 1000).toLocaleTimeString("fr-FR") + "</td></tr>").join("");
+    if (s.alert && s.alert.id !== shownAlert) openAlert(s.alert.id);
+    if (!s.alert && shownAlert) closeAlert();
+  } catch (e) { /* réseau momentanément indisponible */ }
+}
+async function loadHistory() {
+  try {
+    const h = await api("/api/alerts");
+    $("hist").tBodies[0].innerHTML = h.map(r => "<tr><td>" + esc(r.date) + "</td><td>" + esc(r.heure) + "</td><td><b>" + esc(r.symbole) + "</b></td><td style='font-weight:700;color:" +
+      (r.signal === "ACHAT" ? "#15803d" : "#c62828") + "'>" + esc(r.signal) + "</td><td>" + nf(r.cours) + "</td><td>" + esc(r.test) + "</td><td style='white-space:normal;text-align:left'>" +
+      esc(r.notification) + "</td><td>" + esc(r.ack) + "</td><td><button class='sm' onclick=\"openAlert('" + esc(r.id) + "',true)\">Revoir</button></td></tr>").join("");
+  } catch (e) {}
+}
+
+/* ---------------------------------------------------------------- Fenêtre d'alerte */
+async function openAlert(id, review) {
+  try {
+    const a = await api("/api/alert/" + encodeURIComponent(id));
+    shownAlert = (review || a.ack_at) ? null : id;
+    const col = a.signal === "ACHAT" ? "#15803d" : "#c62828";
+    $("alertHead").style.background = col;
+    $("alertTitle").textContent = "🚨 ALERTE " + a.signal + (a.test ? " (TEST)" : "") + " - " + a.symbol + " " + (a.name || "");
+    $("alertMeta").textContent = new Date(a.ts * 1000).toLocaleString("fr-FR") + " · cours " + nf(a.price) + " · bougies " + a.params.candle;
+    $("alertReason").innerHTML = a.checks.map((k, i) => "<li class='" + (k.ok ? "ok" : "ko") + "'>" + "①②③"[i] + " " + (k.ok ? "✔ " : "✘ ") + esc(k.text) + "</li>").join("");
+    $("alertConcl").textContent = a.concl_plain; $("alertConcl").style.color = col;
+    const p = a.params, v = a.values;
+    $("alertParams").textContent = "MM " + p.ma.type + p.ma.period + " = " + nf(v.ma) + " · RSI(" + p.rsi.period + ") = " + nf(v.rsi, 1) +
+      " · MACD(" + p.macd.fast + "," + p.macd.slow + "," + p.macd.signal + ") = " + nf(v.macd, 3) + " / signal " + nf(v.sig, 3) + " · base de temps " + p.interval_s + " s";
+    $("alertNotif").textContent = "Notification : " + a.notif + (a.ack_at ? " · acquittée le " + a.ack_at : "");
+    $("ackBtn").style.display = review || a.ack_at ? "none" : "block";
+    $("alertNewTab").onclick = () => window.open(location.origin + location.pathname + "?alert=" + encodeURIComponent(id), "_blank");
+    $("alertWin").style.display = "block";
+    const c = a.chart; c.ma1 = null; c.ma2 = null;
+    drawChart($("alertPlot"), c, {type: "candle", volume: false, priceTitle: a.symbol + " · cours et " + c.labels.ma, rev: "alert" + id,
+      alert: {signal: a.signal, test: a.test, cross_x: a.cross_x, cross_y: a.cross_y, lines: a.lines, concl: a.concl}});
+    document.title = "🚨 ALERTE " + a.symbol;
+    clearInterval(alarmTimer);
+    if (!review && !a.ack_at) alarmTimer = setInterval(() => { beep(); if (navigator.vibrate) navigator.vibrate(300); }, 1600);
+  } catch (e) { $("cmdMsg").textContent = e.message; }
+}
+function closeAlert() {
+  $("alertWin").style.display = "none"; shownAlert = null; clearInterval(alarmTimer); document.title = "Surveillance Bourse";
+}
+$("ackBtn").onclick = async () => {
+  if (!shownAlert) { closeAlert(); return; }
+  try { await post("/api/alert/" + encodeURIComponent(shownAlert) + "/ack"); } catch (e) { $("cmdMsg").textContent = e.message; }
+  closeAlert(); pollStatus(); loadHistory();
+};
+$("alertWin").addEventListener("click", e => { if (e.target === $("alertWin") && !shownAlert) closeAlert(); });
+
+/* ---------------------------------------------------------------- Démarrage */
+/* ---------------------------------------------------------------- Connexion */
+function showLogin(msg) { $("l_api").value = API; if (msg) $("l_msg").textContent = msg; $("loginWin").style.display = "flex"; $("btnLogout").hidden = true; }
+function hideLogin() { $("loginWin").style.display = "none"; }
+$("l_btn").onclick = async () => {
+  const base = $("l_api").value.trim().replace(/\/+$/, "");
+  if (base !== API) { API = base; LS.set("apiBase", API); TOKEN = ""; LS.set("token", ""); }
+  $("l_msg").textContent = "Connexion…";
+  try {
+    const r = await api("/api/login", {method: "POST", headers: {"Content-Type": "application/json"},
+                                        body: JSON.stringify({password: $("l_pw").value}), login: true, noAuth: true});
+    TOKEN = r.token || ""; LS.set("token", TOKEN); $("l_pw").value = ""; $("l_msg").textContent = "";
+    needLogin = false; hideLogin(); $("cmdMsg").textContent = ""; panels.forEach(p => { p.msg.textContent = ""; });
+    await connect();
+  } catch (e) {
+    $("l_msg").textContent = /fetch|network/i.test(e.message) ? "Serveur inaccessible : vérifiez l'adresse (https://…) et l'autorisation CORS." : e.message;
+  }
+};
+$("l_pw").addEventListener("keydown", e => { if (e.key === "Enter") $("l_btn").click(); });
+$("btnLogout").onclick = () => { TOKEN = ""; LS.set("token", ""); needLogin = true; showLogin(); };
+$("btnXlsx").onclick = async () => {
+  try {
+    const r = await fetch(API + "/api/alerts.xlsx", {headers: TOKEN ? {Authorization: "Bearer " + TOKEN} : {}});
+    if (!r.ok) throw new Error("Téléchargement impossible (" + r.status + ")");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = "Alertes.xlsx";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { $("cmdMsg").textContent = e.message; }
+};
+
+/* ---------------------------------------------------------------- Démarrage */
+async function bootstrap() {
+  CFG = await api("/api/config");
+  fillAlertForm(CFG.alert); fillNotify(CFG.notify);
+  if (!symbol || !CFG.watchlist.some(w => w.symbol === symbol)) symbol = CFG.watchlist.length ? CFG.watchlist[0].symbol : null;
+  renderWatch(); syncPanels(); loadQuotes(); refreshCharts(); pollStatus(); loadHistory();
+  const qa = new URLSearchParams(location.search).get("alert");
+  if (qa && !bootstrap.deepDone) { bootstrap.deepDone = true; openAlert(qa, false); }
+}
+async function connect() {
+  try {
+    const pg = await api("/api/ping", {noAuth: true});
+    if (pg.auth_required && !pg.ok) { needLogin = true; showLogin(); return; }
+    needLogin = false; hideLogin(); $("btnLogout").hidden = !(pg.auth_required && TOKEN);
+    await bootstrap();
+  } catch (e) { needLogin = true; showLogin("Serveur inaccessible : " + e.message); }
+}
+(async function start() {
+  renderPeriods(); fillChartForm(); bindChartForm();
+  armChartTimer();
+  setInterval(loadQuotes, 6000);
+  setInterval(pollStatus, 2500);
+  setInterval(loadHistory, 30000);
+  await connect();
+})();
+</script>
+</body>
+</html>
